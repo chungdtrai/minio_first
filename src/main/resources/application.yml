@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:oracle:thin:@10.159.10.90:1521/pdblris_test
+    username: ioc
+    password: ioc#1368
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+server:
+  port: 8081
+
+minio_url: storage-egov-bcqg-test.vnpt.vn
+minio_user: minio
+minio_pass: bWluaW8tZWdvdi1iY3FnLXRlc3Q=
+bucket_name_to: lris
+bucket_name_from: 87654321
+
+#minio_url_server: minio-egov-vsr.vnpt.vn
+#minio_user_server: nCgktQGGIvVW36t5HZM5
+#minio_pass_server: EmubgEvIfufmUa1BQIiTRKruAnSjtP62yYOORxay
+#bucket_name_to_server: lris
+#bucket_name_from_server: lris-vsr
