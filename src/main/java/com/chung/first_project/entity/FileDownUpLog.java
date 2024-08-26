@@ -8,9 +8,6 @@ import javax.persistence.*;
 
 @Entity
 @Table(name = "file_up_down_log")
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class FileDownUpLog extends LogParent{
 
 }

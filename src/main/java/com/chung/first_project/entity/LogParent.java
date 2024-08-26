@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 
 import javax.persistence.*;
 
-@Entity
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -19,7 +18,7 @@ public class LogParent{
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private Long tenant_id;
-    private String img_name;
+    private String file_name;
     private Integer status;
     private String message;
 }

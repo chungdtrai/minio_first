@@ -8,10 +8,6 @@ import lombok.NoArgsConstructor;
 import javax.persistence.*;
 
 @Entity
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-@Data
 @Table(name="LOG_ADM_ACTIVITY_PROCESS")
 public class LogAdmActivityProcess extends LogParent{
 

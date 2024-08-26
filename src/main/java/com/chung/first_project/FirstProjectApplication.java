@@ -4,6 +4,8 @@ import com.chung.first_project.entity.*;
 import com.chung.first_project.repository.*;
 import io.minio.MinioClient;
 import io.minio.ObjectStat;
+import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
@@ -12,20 +14,28 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.io.File;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 
+@Slf4j
 @SpringBootApplication
 public class FirstProjectApplication implements CommandLineRunner {
     @Autowired
-//    FileDownUpRepository fileDownUpRepository;
-//    LogSignatureImageRepository logSignatureImageRepository;
-//    LogOrObjectAttachmentRepository logOrObjectAttachmentRepository;
-//    LogOrIndAttachmentRepsoritory logOrIndAttachmentRepsoritory;
+    FileDownUpRepository fileDownUpRepository;
+    @Autowired
+    LogSignatureImageRepository logSignatureImageRepository;
+    @Autowired
+    LogOrObjectAttachmentRepository logOrObjectAttachmentRepository;
+    @Autowired
+    LogOrIndAttachmentRepsoritory logOrIndAttachmentRepsoritory;
+    @Autowired
     LogAdmActivityProcessRepository logAdmActivityProcessRepository;
+    @Autowired
+    LogParentRepository logParentRepository;
     @Autowired
     JdbcTemplate jdbcTemplate;
     @Value("${minio_url}")
@@ -84,74 +94,65 @@ public class FirstProjectApplication implements CommandLineRunner {
 //        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         try {
             MinioClient minioClient = new MinioClient(minioUrl, minioUser, minioPass);
-//                    minioClient.copyObject(bucketNameFrom,fileName, bucketNameTo, folderName+"/"+fileName);
-            String sql = "select TENANT_ID, FILE_PATH from ADM_ACTIVITY_PROCESS where FILE_PATH is not null";
-            List<Map<String, Object>> data = jdbcTemplate.queryForList(sql);
+            String sql_SIG_SIGNATURE = "select TENANT_ID, SIGN_FILE from ioc_data01.SIG_SIGNATURE where SIGN_FILE is not null";
+            moveObject(sql_SIG_SIGNATURE, minioClient, new FileDownUpLog(), fileDownUpRepository);
 
-            for(Map<String, Object> map : data) {
-                String fileName = map.get("FILE_PATH").toString();
-                String folderName = map.get("TENANT_ID").toString();
-                System.out.println(fileName);
-                System.out.println("---------------------");
-                try {
-                    ObjectStat objectStat = minioClient.statObject(bucketNameFrom, fileName);
-                    minioClient.copyObject(bucketNameFrom,fileName, bucketNameTo, folderName+"/"+fileName);
-//                    ObjectStat objectStat = minioClient.statObject(bucketNameFrom, "1609331059953_HDSD_Bo_Tinh_Huyen(5).docx");
-//                    minioClient.copyObject("87654321","1609331059953_HDSD_Bo_Tinh_Huyen(5).docx", "lris", "56/1609331059953_HDSD_Bo_Tinh_Huyen(5).docx");
-                    logAdmActivityProcessRepository.save(LogAdmActivityProcess.builder()
-                                    .tenant_id(Long.valueOf(folderName))
-                                    .file_path(fileName)
-                                    .status(1)
-                                    .message("successfull")
-                            .build());
-                } catch (Exception e) {
-                    logAdmActivityProcessRepository.save(LogAdmActivityProcess.builder()
-                            .tenant_id(Long.valueOf(folderName))
-                            .file_path(fileName)
-                            .status(0)
-                            .message("error " + e.getMessage())
-                            .build());
-                }
-            }
+            String sql_SIG_SIGNATURE_IMAGE = "select TENANT_ID, IMG_NAME from ioc_Data01.SIG_SIGNATURE_IMAGE where IMG_NAME is not null";
+            moveObject(sql_SIG_SIGNATURE_IMAGE, minioClient, new LogSignatureImage(),logSignatureImageRepository);
+
+            String sql_OR_OBJECT_ATTACHMENT= "select TENANT_ID, ATTACHMENT_NAME from ioc_data01.OR_OBJECT_ATTACHMENT where ATTACHMENT_NAME is not null";
+            moveObject(sql_OR_OBJECT_ATTACHMENT, minioClient, new LogOrObjectAttachment(),logOrObjectAttachmentRepository);
+
+            String sql_OR_IND_ATTACHMENT = "select TENANT_ID, ATTACHMENT_NAME from ioc_data01.OR_IND_ATTACHMENT where ATTACHMENT_NAME is not null";
+            moveObject(sql_OR_IND_ATTACHMENT, minioClient, new LogOrIndAttachment(), logOrIndAttachmentRepsoritory);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    public void moveObject(String sql, MinioClient minioClient, LogParent logParent, JpaRepository jpaRepository) {
+    public <T extends LogParent>void moveObject(String sql, MinioClient minioClient, LogParent logParent ,LogParentRepository logParentRepository) {
         List<Map<String, Object>> data = jdbcTemplate.queryForList(sql);
-        Set<String> keys = new HashSet<>();
+        Set<String> keys = data.get(0).keySet();
         String columeName = null;
         for(String item:keys){
             if(!item.equals("TENANT_ID")) columeName = item;
         }
         for(Map<String, Object> map : data) {
+            logParent = returnNewLogObject(logParent);
             String fileName = map.get(columeName).toString();
             String folderName = map.get("TENANT_ID").toString();
             System.out.println(fileName);
             System.out.println("---------------------");
             try {
-                ObjectStat objectStat = minioClient.statObject(bucketNameFrom, fileName);
+                minioClient.statObject(bucketNameFrom, fileName);
                 minioClient.copyObject(bucketNameFrom,fileName, bucketNameTo, folderName+"/"+fileName);
-//                    ObjectStat objectStat = minioClient.statObject(bucketNameFrom, "1609331059953_HDSD_Bo_Tinh_Huyen(5).docx");
-//                    minioClient.copyObject("87654321","1609331059953_HDSD_Bo_Tinh_Huyen(5).docx", "lris", "56/1609331059953_HDSD_Bo_Tinh_Huyen(5).docx");
-                logAdmActivityProcessRepository.save(LogAdmActivityProcess.builder()
-                        .tenant_id(Long.valueOf(folderName))
-                        .file_path(fileName)
-                        .status(1)
-                        .message("successfull")
-                        .build());
+                logParent.setTenant_id(Long.valueOf(folderName));
+                logParent.setFile_name(fileName);
+                logParent.setStatus(1);
+                logParent.setMessage("successfull");
+                logParentRepository.save(logParent);
             } catch (Exception e) {
-                logAdmActivityProcessRepository.save(LogAdmActivityProcess.builder()
-                        .tenant_id(Long.valueOf(folderName))
-                        .file_path(fileName)
-                        .status(0)
-                        .message("error " + e.getMessage())
-                        .build());
+                logParent.setTenant_id(Long.valueOf(folderName));
+                logParent.setFile_name(fileName);
+                logParent.setStatus(0);
+                logParent.setMessage("error " + e.getMessage());
+                logParentRepository.save(logParent);
             }
         }
     }
-
+    public LogParent returnNewLogObject(Object object){
+        if(object instanceof FileDownUpLog){
+            return new FileDownUpLog();
+        }else if(object instanceof LogAdmActivityProcess){
+            return new LogAdmActivityProcess();
+        }else if(object instanceof LogOrIndAttachment){
+            return new LogOrIndAttachment();
+        }else if(object instanceof LogOrObjectAttachment){
+            return new LogOrObjectAttachment();
+        }else {
+            return new LogSignatureImage();
+        }
+    }
 //    public void saveCheckUpDown(String fileName, String folderName, Integer check) {
 //        try{
 //            fileDownUpRepository.save(FileDownUpLog.builder()
